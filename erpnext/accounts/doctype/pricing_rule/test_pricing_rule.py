@@ -650,6 +650,51 @@ class TestPricingRule(ERPNextTestSuite):
 		frappe.delete_doc_if_exists("Pricing Rule", "_Test Pricing Rule 1")
 		frappe.delete_doc_if_exists("Pricing Rule", "_Test Pricing Rule 2")
 
+	def test_multiple_pricing_rules_with_margin(self):
+		# get_item_details sums the margins of rules applied together (apply_price_discount_rule);
+		# saving the document must keep that sum instead of the margin of the last rule only.
+		make_pricing_rule(
+			selling=1,
+			margin_type="Percentage",
+			margin_rate_or_amount=20,
+			priority=1,
+			apply_multiple_pricing_rules=1,
+			title="_Test Pricing Rule 1",
+		)
+		make_pricing_rule(
+			selling=1,
+			margin_type="Percentage",
+			margin_rate_or_amount=10,
+			priority=2,
+			apply_multiple_pricing_rules=1,
+			title="_Test Pricing Rule 2",
+		)
+		make_pricing_rule(
+			selling=1,
+			margin_type="Percentage",
+			margin_rate_or_amount=-5,
+			priority=3,
+			apply_multiple_pricing_rules=1,
+			title="_Test Pricing Rule 3",
+		)
+
+		si = create_sales_invoice(do_not_save=True, customer="_Test Customer 1", qty=1)
+		si.items[0].price_list_rate = 1000
+		si.payment_schedule = []
+		si.insert(ignore_permissions=True)
+
+		item = si.items[0]
+		self.assertEqual(len(frappe.parse_json(item.pricing_rules)), 3)
+		self.assertEqual(item.margin_type, "Percentage")
+		self.assertEqual(item.margin_rate_or_amount, 25)
+		self.assertEqual(item.rate_with_margin, 1250)
+		self.assertEqual(item.rate, 1250)
+
+		# recalculating an existing document must not change the result
+		si.calculate_taxes_and_totals()
+		self.assertEqual(si.items[0].margin_rate_or_amount, 25)
+		self.assertEqual(si.items[0].rate, 1250)
+
 	def test_multiple_pricing_rules_with_apply_discount_on_discounted_rate(self):
 		frappe.delete_doc_if_exists("Pricing Rule", "_Test Pricing Rule")
 

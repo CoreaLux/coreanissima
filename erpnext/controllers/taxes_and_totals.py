@@ -187,7 +187,13 @@ class calculate_taxes_and_totals:
 					continue
 
 				item.margin_type = pricing_rule.margin_type
-				item.margin_rate_or_amount = pricing_rule.margin_rate_or_amount
+				# Same rule as apply_price_discount_rule: margins of rules applied together add up.
+				if pricing_rule.apply_multiple_pricing_rules:
+					item.margin_rate_or_amount = (
+						flt(item.margin_rate_or_amount) + pricing_rule.margin_rate_or_amount
+					)
+				else:
+					item.margin_rate_or_amount = pricing_rule.margin_rate_or_amount
 
 		item.rate_with_margin = get_rate_with_margin(item)
 		if item.discount_percentage > 0:
